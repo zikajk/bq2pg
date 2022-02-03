@@ -1,0 +1,12 @@
+{ :integrations
+ [
+  {
+   :name "test"
+   :query  "SELECT * FROM `project.test.pokemons` LIMIT 1000"
+   :location "EU"
+   :target-pg-table "public.pokemons"
+   :method "replace"
+   :timeout 120
+   }
+  ]
+ }

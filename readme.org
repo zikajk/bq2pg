@@ -1,0 +1,127 @@
+* BQ2PG
+- Querying Bigquery can get really expensive and you can not run it locally.
+- So I created BQ2PG because "No such thing as a high-priced question."
+  
+** Main Points
+[[./resources/images/intro.png]]
+- Migrate data from Bigquery to Postgresql easily.
+- Migrate data to already existing tables or create new ones automatically. 
+- Append rows or replace whole table. 
+- Run export and import individually.
+  + If there is no new export, no import will run. 
+  + Data are loaded from small GZIP files, keep your disk's space free!
+
+
+** How it works
+[[./resources/images/bq2pg.jpg]]
+
+*** Config
+- This is the main configuration file.
+- The only mandatory part is =:integrations=, everything else can via provided by environment variables.
+- check *example_run.sh* or [[Environment variables]].
+
+ 
+*** GCS and BQ clients 
+- both clients will be initialized with /$BQ2PGSA/ environment variable if provided
+- you can also set the path inside the main configuration file under /:sa-path/ key.
+- if you do not provide service account key it will try to use /gcloud tools/ login.
+
+*** Integrations
+- Integrations must be created under *:integration* key in the main config file. 
+- Take a look at example integration in [[./example/pokemon_integration.edn]]
+- These are mandatory keys:
+   + *:name* - transfer name, also used for bucket folder name - must be unique in all configurations!
+   + *:query* - SQL query definition for data extraction
+   + *:location* - location of BigQuery dataset
+   + *:target-pg-table* - target postgre table in format schema_name.table_name
+   + *:method* - postgre update mode - append (default) or replace (truncate target table before)
+   + *:timeout* - timeout in seconds, checks on bucket for new export from BQ (if new export does not exist after timeout exceeded, then continue)
+
+- Bigquery fields are converted to text:
+  - if your /:target-pg-table/ already exists, it will try to convert value to its column type
+  - If that table doesn't exist it will be created and every field will be imported as text
+        
+*** Export?
+- You can set /:export?/ key to false if you don't want bq2pg to export your data from Bigqeury to Google cloud storage.
+- This value can be configured in main config file under /:export?/ key or as /BQEXPORT/ env variable.
+
+*** Import?
+- You can set /:import?/ key to false if you don't want bq2pg to import your data into Postgresql database.
+- *Keep in mind:* bq2pg creates record for every last integration in .last_import.edn so if you have already imported some existing export it won't be imported twice. 
+  - it means that it won't be imported until export to the target folder finishes. 
+- This value can be configured in main config file under /:import?/ key or as /PGIMPORT/ env variable.
+
+*** Stream GZIP files
+- Bigquery data are exported to a batch of GZIP files which are loaded one by one and save space on your disk. 
+  
+
+** Examples
+*** Example 1 - easy and quick
+1. Download bq2pg-1.jar from releases
+2. create your /integration.edn/ like this:
+  #+BEGIN_SRC clojure
+    {:export? true
+     :import? true
+     :gcs-name "my-bucket"
+     :gcs-folder "bq2pg"
+     :db {:dbtype "postgres"
+          :dbname "postgres"
+          :user "postgres"
+          :host "somehost"
+          :port 5432
+          :password "my_password"}
+     :integrations [{:name "test"
+                     :query  "SELECT * FROM `project.test.pokemons` LIMIT 1000"
+                     :location "EU"
+                     :target-pg-table "public.pokemons"
+                     :method "replace"
+                     :timeout 120}]}
+  #+END_SRC
+  
+3. run =java -jar bq2pg.jar integration.edn=
+
+*** Example 2 - clojure developer, installation 
+1. run ./install.sh
+2. bq2pg will be compiled and you can run it by =~/bin/bq2pg= 
+   + or add =$HOME/bin= to your PATH.
+
+*** Example 3 - clojure developer, interactive use
+1. run repl and switch to =user= namespace
+2. you can see example configuration + integration you must update before you run *integrate-dev!*. 
+
+*** Example 4 - real use-case 
+1. Place /bq2pg.jar/ or personalized /example_run.sh/ somewhere in your /PATH/ (see [[Example 2 - clojure developer, installation]])
+2. Configure every environment variable so your config file will contain only integrations.
+3. Schedule bq2pg with same env vars but different configs and synchronize Bigquery and Postgresql on daily basis. 
+
+** Environment variables
+- if you are into 12factor ;) 
+
+- *$PGHOST* = Name / address of the Postgresql database server you will connect to.
+- *$PGDATABASE* = Database name
+- *$PGPORT* = Database port
+- *$PGUSER* = Database user
+- *$PGPASSWORD* = Database password
+  - this is *OPTIONAL* - i would recommend you to use .pgpass which should be parsed. 
+- *$BQEXPORT* = true [default] / false
+  + Disable this only if you want to export once but import multiple times.
+- *$PGIMPORT* = true / false
+  + Disable this only if you only want to export data from the environment.
+- *$GCSNAME* = bucket name
+- *$GCSFOLDER* = directory name on bucket - for bq2pg purposes
+- *$BQ2PGSA* = path to service account JSON key
+  + This is an !optional! parameter, you can also login via =gcloud auth login=...
+- If you happen to use a proxy, don't forget to set one up as well:
+  + *$PROXYHOST* = Adress of proxy server
+  + *$PROXYUSER* = Proxy user
+  + *$PROXYPASSWORD* = Proxy password
+ 
+** Caveats
+1. Your Bigquery dataset and Google Cloud Storage must exist in the same location or you get error.
+2. you must have a =bigquery.job.create= rights so you can export data.
+   - + r/w rights on configured GCS 
+
+     
+** Development
+- There is Malli function schema for every fn, lintering is prepared in *user* namespace - this makes debugging experience much better.
+
