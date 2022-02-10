@@ -120,7 +120,6 @@
 1. Your Bigquery dataset and Google Cloud Storage must exist in the same location or you get error.
 2. you must have a =bigquery.job.create= rights so you can export data.
    - + r/w rights on configured GCS 
-3. No support for nested and repeated data, *yet!*. 
      
 ** Development
 - There is Malli function schema for every fn, lintering is prepared in *user* namespace - this makes debugging experience much better.

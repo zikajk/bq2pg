@@ -18,17 +18,17 @@
 
 (defn stream-gzip-to-db!
   "Streams content of GZIPPED csv into table in CONNECTABLE."
-  [gzip-path delimiter con table-name]
+  [gzip-path con table-name]
   (with-open [in (-> gzip-path
                      io/input-stream
                      java.util.zip.GZIPInputStream.
                      java.io.InputStreamReader.
                      java.io.BufferedReader.)]
     (timbre/info (format "Streaming %s to %s" gzip-path table-name))
-    (db/insert-csv-from-stdin! in con table-name delimiter)))
+    (db/insert-csv-from-stdin! in con table-name)))
 
 (m/=> stream-gzip-to-db! [:=>
-                          [:cat string? string? Connectable string?]
+                          [:cat string? Connectable string?]
                           any?])
 
 (defn stream-gcs-uri-to-db!
@@ -44,7 +44,7 @@
              (doseq [uri gzip-uris]
                 (timbre/info (format "Downloading file from: %s" uri))
                (let [blob (gcs/download-blob! gcs-client uri)]
-                 (stream-gzip-to-db! blob "," con target-pg-table)
+                 (stream-gzip-to-db! blob con target-pg-table)
                  (timbre/info "Gzip has been loaded into DB")
                  (fs/delete-if-exists blob)))
              (timbre/info "Job finished!"))

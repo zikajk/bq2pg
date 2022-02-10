@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [com.taoensso/timbre "5.1.2"]
                  [cprop "0.1.18"]
+                 [org.clojure/data.json "2.4.0"]
                  [expound "0.8.9"]
                  [com.stuartsierra/component "1.0.0"]
                  [com.github.seancorfield/next.jdbc "1.2.674"]
@@ -17,8 +18,7 @@
                  [clj-time "0.15.2"]
                  [com.taoensso/timbre "5.1.2"]
                  [authenticator "0.1.1"]
-                 [metosin/malli "0.8.0"]
-                 [org.clojure/data.csv "1.0.0"]]
+                 [metosin/malli "0.8.0"]]
   :repl-options {:init-ns user}
   :plugins [[lein-cljfmt "0.8.0"]]
   :main ^:skip-aot bq2pg.core

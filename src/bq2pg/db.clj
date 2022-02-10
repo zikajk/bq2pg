@@ -2,14 +2,13 @@
   (:require
    [clojure.string :as str]
    [clojure.java.io :as io]
+   [clojure.data.json :as json]
    [next.jdbc :as jdbc]
    [next.jdbc.date-time]
-   [clojure.data.csv :as csv]
    [bq2pg.config :refer [Table-name]]
    [malli.core :as m]
    [taoensso.timbre :as timbre]
-   [next.jdbc.types
-    :as types]))
+   ))
 
 (defn connectable?
   "Returns true if `conn` can be used by JDBC to initialize connection
@@ -35,18 +34,6 @@
 (m/=> build-query [:=>
                    [:cat Table-name Header]
                    string?])
-
-(defn- get-header
-  "Takes first row from `coll` as a header
-   which is splitted on a `delimiter`. "
-  [coll delimiter]
-  (->> (str/split (first coll)
-                  (re-pattern delimiter))
-       (mapv str)))
-
-(m/=> get-header [:=>
-                  [:cat [:sequential string?] string?]
-                  Header])
 
 (defn truncate-table!
   "Tries to reuse or create jdbc connection based on `connectable`  and truncate `table`.
@@ -83,25 +70,32 @@
     (timbre/info query )
     (jdbc/execute! con [query])))
 
+(defn- prepare-values [lines]
+  (for [line (map vals lines)]
+    (for [v line]
+      (if (or (sequential? v) (map? v))
+        (json/write-str v)
+        v))))
+
 (defn insert-csv-from-stdin!
   "Inserts csv from `stdin` parsed with `delimiter` to `table` via next.jdbc `con`."
-  [stdin con table-name delimiter]
+  [stdin con table-name]
   (with-open [reader (io/reader stdin)]
-    (let [lines (line-seq reader)
-          table-header (get-header lines delimiter)]
+    (let [lines (map json/read-str (line-seq reader))
+          table-header (-> (first lines) keys)]
       (when-not (table-exists? con table-name)
         (create-table! con table-name table-header))
       (doall
        (let [query (build-query table-name table-header)]
-         (doseq [batch (partition-all 100000 (rest lines))]
+         (doseq [batch (partition-all 100000 lines)]
            (try
              (jdbc/execute-batch! con
                                   query
-                                  (->> batch (mapcat csv/read-csv))
+                                  (->> batch prepare-values)
                                   {:reWriteBatchedInserts true})
              (catch Exception e (timbre/debug e))
              )))))))
 
 (m/=> insert-csv-from-stdin! [:=>
-                              [:cat any? Connectable Table-name string?]
+                              [:cat any? Connectable Table-name]
                               [:or seq? nil?]])
