@@ -110,7 +110,7 @@
 - *$GCSNAME* = bucket name
 - *$GCSFOLDER* = directory name on bucket - for bq2pg purposes
 - *$BQ2PGSA* = path to service account JSON key
-  + This is an !optional! parameter, you can also login via =gcloud auth login=...
+  + This is an *optional* parameter, you can also login via =gcloud auth login=...
 - If you happen to use a proxy, don't forget to set one up as well:
   + *$PROXYHOST* = Adress of proxy server
   + *$PROXYUSER* = Proxy user
@@ -120,7 +120,7 @@
 1. Your Bigquery dataset and Google Cloud Storage must exist in the same location or you get error.
 2. you must have a =bigquery.job.create= rights so you can export data.
    - + r/w rights on configured GCS 
-
+3. No support for nested and repeated data, *yet!*. 
      
 ** Development
 - There is Malli function schema for every fn, lintering is prepared in *user* namespace - this makes debugging experience much better.
