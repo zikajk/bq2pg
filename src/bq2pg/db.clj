@@ -22,58 +22,7 @@
 
 (def Connectable [:fn connectable?])
 
-(defn- get-type
-  "Gets Postgresql type for selected `column-name` in `table` with jdbc based on `connectable`."
-  [connectable table-name column-name]
-  (let [query "SELECT data_type FROM information_schema.columns where table_schema = '%s'and table_name = '%s' and upper(column_name) = '%s'"
-        [schema table] (str/split (name table-name) #"\.")
-        col-name (str/upper-case column-name)]
-    (:columns/data_type (jdbc/execute-one!
-                         connectable
-                         [(format query schema table col-name)]))))
-
-(m/=> get-type [:=>
-                [:cat Connectable Table-name string?]
-                [:enum "bool" "bit" "int8" "bigserial" "oid" "bytea" "char" "bpchar" "numeric" "int4" "serial" "int2" "smallserial"
-                 "float4" "float8" "money" "name" "text" "character varying" "varchar" "date" "time" "timetz" "timestamp" "timestampz"]])
-
-(defn convert-type
-  "Convert Postgresql `type` to conversion function"
-  [type]
-  (case type
-    ("bool" "bit")                                   #(types/as-bit %)
-    ("int8" "bigserial" "oid")                       #(types/as-bigint %)
-    "bytea"                                          #(types/as-binary %)
-    ("char" "bpchar")                                #(types/as-char %)
-    "numeric"                                        #(types/as-numeric %)
-    ("int4" "serial")                                #(types/as-integer %)
-    ("int2" "smallserial")                           #(types/as-smallint %)
-    "float4"                                         #(types/as-real %)
-    ("float8" "money")                               #(types/as-double)
-    ("name", "text", "character varying", "varchar") #(types/as-varchar %)
-    "date"                                           #(try (.parse (java.text.SimpleDateFormat. "yyyy-MM-dd") %)
-                                                           (catch Exception _ nil))
-    ("time", "timetz")                               #(try (types/as-time %)
-                                                           (catch Exception _ nil))
-    ("timestamp", "timestampz")                      #(try (types/as-timestamp %)
-                                                           (catch Exception _ nil))
-    #(types/as-other %)))
-
-(m/=> convert-type [:=>
-                    [:cat [:enum "bool" "bit" "int8" "bigserial" "oid" "bytea" "char" "bpchar" "numeric" "int4" "serial" "int2" "smallserial"
-                       "float4" "float8" "money" "name" "text" "character varying" "varchar" "date" "time" "timetz" "timestamp" "timestampz"]]
-                    fn?])
-
 (def Header [:vector string?])
-
-(defn- get-conv-fns
-  "Takes `header` and maps every column in `table` to matched conversion functions."
-  [connectable table-name header]
-  (mapv #(convert-type (get-type connectable table-name %)) header))
-
-(m/=> get-conv-fns [:=>
-                    [:cat Connectable Table-name Header]
-                    vector?])
 
 (defn- build-query
   "Takes `table` and `header` and build sql query template for next.jdbc"
@@ -143,17 +92,14 @@
       (when-not (table-exists? con table-name)
         (create-table! con table-name table-header))
       (doall
-       (let [query (build-query table-name table-header)
-             conv-fns (get-conv-fns con table-name table-header)]
+       (let [query (build-query table-name table-header)]
          (doseq [batch (partition-all 100000 (rest lines))]
            (try
-             (jdbc/execute-batch! con query
-                                  (->> batch
-                                       (mapcat csv/read-csv)
-                                       (mapv (fn [row] (map #(%1 %2) conv-fns row))))
+             (jdbc/execute-batch! con
+                                  query
+                                  (->> batch (mapcat csv/read-csv))
                                   {:reWriteBatchedInserts true})
-             (catch Exception e
-               (timbre/debug e))
+             (catch Exception e (timbre/debug e))
              )))))))
 
 (m/=> insert-csv-from-stdin! [:=>

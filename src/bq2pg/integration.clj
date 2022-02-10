@@ -38,7 +38,7 @@
   (let [gzip-uris (gcs/list-gzip-uris gcs-client gcs-folder-uri)
         table-exists? (db/table-exists? connectable target-pg-table)]
     (if (m/validate Gzip-uris gzip-uris)
-      (try (jdbc/with-transaction [con (jdbc/get-connection connectable)]
+      (try (jdbc/with-transaction [con (jdbc/get-connection (merge connectable {:stringtype "unspecified"}))]
              (when (and table-exists? (= method "replace"))
                (db/truncate-table! con target-pg-table))
              (doseq [uri gzip-uris]
