@@ -135,7 +135,7 @@
         table-id (TableId/of project dataset table)
         extract-config (-> (ExtractJobConfiguration/newBuilder table-id destination-uri)
                            (.setCompression "gzip")
-                           (.setFormat "CSV")
+                           (.setFormat "NEWLINE_DELIMITED_JSON")
                            .build)
         job-info (JobInfo/of extract-config)]
     (.create bq-client job-info (into-array BigQuery$JobOption []))))
