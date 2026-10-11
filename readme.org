@@ -1,4 +1,7 @@
 * BQ2PG
+
+*!!!DEPRECATED!!!*
+
 - Querying Bigquery can get really expensive and you can not run it locally.
 - So I created BQ2PG because "No such thing as a high-priced question."
   
